@@ -55,6 +55,7 @@ merge = foldr (<>) mempty
 
 -- Should go to Setup.hs
 
+keyExchange :: SecretKey -> PublicKey -> DhSecret
 keyExchange = flip dh
 
 publish :: (MonadRandom m) => m [PublicKey]
