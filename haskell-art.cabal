@@ -19,7 +19,8 @@ library
   exposed-modules:     Lib
   other-modules:       Lib.Prelude
   build-depends:       base >= 4.7 && < 5
-                     , protolude >= 0.1.6 && < 0.2
+                     , protolude >= 0.2 && < 0.3
+                     , cryptonite
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
 
@@ -29,7 +30,7 @@ executable haskell-art-exe
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , haskell-art
-                     , protolude >= 0.1.6 && < 0.2
+                     , protolude >= 0.2 && < 0.3
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
 
@@ -39,7 +40,7 @@ test-suite haskell-art-test
   main-is:             Spec.hs
   build-depends:       base
                      , haskell-art
-                     , protolude >= 0.1.6 && < 0.2
+                     , protolude >= 0.2 && < 0.3
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
