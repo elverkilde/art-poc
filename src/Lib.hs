@@ -7,22 +7,29 @@ For more information on how to write Haddock comments check the user guide:
 <https://www.haskell.org/haddock/doc/html/index.html>
 -}
 module Lib
-    ( someFunc
+{-    ( someFunc
     , Tree (..)
     , copaths
     , setup
 
     -- for debugging
     , publish
-    ) where
+    )
+-}
+where
 
 import Lib.Prelude
 
 -- Tree.hs imports
 
 -- Setup.hs imports
-import Crypto.Random.Types (MonadRandom)
-import Crypto.PubKey.Curve25519
+import Control.Monad.Random.Class
+--import Crypto.Random.Types (MonadRandom)
+--import Crypto.PubKey.Curve25519
+
+import Control.Monad.State
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 -- | Prints someFunc
 --
@@ -53,14 +60,67 @@ merge :: (Monoid a) => Tree a -> a
 merge = foldr (<>) mempty
 
 
--- Should go to Setup.hs
+newtype DHSimple = DHSimple { private :: Int }
+  deriving (Show, Eq)
 
-keyExchange :: SecretKey -> PublicKey -> DhSecret
-keyExchange = flip dh
+newtype DHSimplePub = DHSimplePub { public :: Int }
+  deriving (Show, Eq)
 
-publish :: (MonadRandom m) => m [PublicKey]
-publish = replicateM 2 (fmap toPublic generateSecretKey)
+genSecret :: MonadRandom m => m DHSimple
+genSecret = DHSimple <$> getRandom
 
+p :: Int
+p = 23
+g :: Int
+g = 5
+
+getPub :: DHSimple -> DHSimplePub
+getPub (DHSimple priv) = DHSimplePub $ (g ^ priv) `mod` p
+
+exchange :: DHSimple -> DHSimplePub -> DHSimple
+exchange (DHSimple priv) (DHSimplePub pub) =
+  DHSimple $ (pub ^ priv) `mod` p
+
+type UserId = Text
+
+chat :: State (Map UserId DHSimplePub) ()
+chat = do
+  let alice = DHSimple 4
+      bob   = DHSimple 3
+
+  modify $ Map.insert "alice" (getPub alice)
+  modify $ Map.insert "bob" (getPub bob)
+
+data CoPath = CoPath
+  { trees :: [Tree UserId] }
+  deriving (Show, Eq)
+
+data ARTGroup = ARTGroup
+  { leafKeys :: [DHSimplePub]
+  , copath   :: Map UserId CoPath
+  } deriving (Show, Eq)
+
+setup :: DHSimple -> [DHSimplePub] -> ARTGroup
+setup creator others =
+  let suk = DHSimple 2
+      leafs = (exchange suk) <$> others
+      paths = Map.fromList []
+  in ARTGroup (getPub <$> leafs) paths
+
+chat2 = let alice = DHSimple 4
+            bob   = DHSimple 3
+            eve   = DHSimple 5
+            jon   = DHSimple 6
+            group = setup alice (getPub <$> [bob, eve, jon])
+        in group
+
+--keyExchange :: SecretKey -> PublicKey -> DhSecret
+--keyExchange = flip dh
+
+--publish :: (MonadRandom m) => m [PublicKey]
+--publish = replicateM 2 (fmap toPublic generateSecretKey)
+
+{-
 setup :: (MonadRandom m, MonadIO m) => [PublicKey] -> m ()
 setup bundles = do
   -- secretKey <- generateSecretKey
@@ -68,3 +128,4 @@ setup bundles = do
 
   let leafKeys = fmap (keyExchange setupKey) bundles
   print (fmap secretKey leafKeys)
+-}

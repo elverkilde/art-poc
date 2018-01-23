@@ -1,4 +1,10 @@
 import Protolude
 
+import Test.Tasty
+import Test.Tasty.HUnit
+
+tests :: TestTree
+tests = testGroup "tree" []
+
 main :: IO ()
-main = putStrLn ("Test suite not yet implemented" :: Text)
+main = defaultMain tests
