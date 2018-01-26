@@ -101,23 +101,23 @@ type UserId = Text
 
 data ARTGroup = ARTGroup
   { leafKeys :: [(UserId, DHSimple)]
-  , copath   :: Map UserId [DHSimplePub]
+  , copath   :: Map UserId [DHSimple]
   } deriving (Show, Eq)
 
-setup :: (UserId, DHSimple) -> [(UserId, DHSimplePub)] -> ARTGroup
+setup :: (UserId, DHSimple) -> [(UserId, DHSimplePub)] -> Maybe ARTGroup
 setup creator others =
   let suk = DHSimple 2
       leafs = (\(i, s) -> (i, exchange suk s)) <$> others
       tree  = mkTree (creator:leafs)
       nodes = mkNodes <$> tree
-      paths = Map.fromList []
-  in ARTGroup leafs paths
+      paths = Map.fromList <$> (flip leafLocs1 [] <$> nodes)
+  in (ARTGroup leafs) <$> paths
 
 getVal (Node v _ _) = v
 getVal (Leaf i v) = v
 
-leafLocs1 (Node v l r) acc = Node () (leafLocs1 l (getVal r:acc)) (leafLocs1 r (getVal l:acc))
-leafLocs1 (Leaf i v) acc = Leaf i acc
+leafLocs1 (Node v l r) acc = (leafLocs1 l (getVal r:acc)) ++ (leafLocs1 r (getVal l:acc))
+leafLocs1 (Leaf i v) acc = [(i, acc)]
 
 chat2 = let alice = ("alice", DHSimple 4)
             bob   = ("bob", getPub (DHSimple 3))
