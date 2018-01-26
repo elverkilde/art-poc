@@ -40,26 +40,27 @@ someFunc = putStrLn ("someFunc" :: Text)
 
 
 -- Should go to Tree.hs
-data Tree a b = Leaf a | Node b (Tree a b) (Tree a b)
+data Tree a b = Leaf UserId a | Node b (Tree a b) (Tree a b)
             deriving (Show, Eq)
 
 mkNodes n@(Node _ l r) = Node (merge n) (mkNodes l) (mkNodes r)
-mkNodes (Leaf v) = Leaf v
+mkNodes (Leaf i v) = Leaf i v
 
 merge (Node _ l r) = exchange1 (merge l) (merge r)
-merge (Leaf v) = v
+merge (Leaf i v) = v
 
 test = mkNodes (Node ()
-                 (Node () (Leaf (DHSimple 5)) (Leaf (DHSimple 2)))
-                 (Node () (Leaf (DHSimple 3)) (Leaf (DHSimple 4)))
+                 (Node () (Leaf "a" (DHSimple 5)) (Leaf "b" (DHSimple 2)))
+                 (Node () (Leaf "c" (DHSimple 3)) (Leaf "d" (DHSimple 4)))
                )
-
+{-
 treeMap f (Node v l r) = Node (f v) (treeMap f l) (treeMap f r)
-treeMap f (Leaf v) = Leaf (f v)
+treeMap f (Leaf i v) = Leaf i (f v)
+-}
 
 mkForrest []  = []
-mkForrest [x] = [Leaf x]
-mkForrest (x1:x2:xs) = Node () (Leaf x1) (Leaf x2):mkForrest xs
+mkForrest [(i, x)] = [Leaf i x]
+mkForrest ((i1,x1):(i2,x2):xs) = Node () (Leaf i1 x1) (Leaf i2 x2):mkForrest xs
 
 chop [] = []
 chop [x] = [x]
@@ -99,28 +100,28 @@ type UserId = Text
 
 
 data ARTGroup = ARTGroup
-  { leafKeys :: [DHSimplePub]
+  { leafKeys :: [(UserId, DHSimple)]
   , copath   :: Map UserId [DHSimplePub]
   } deriving (Show, Eq)
 
-setup :: DHSimple -> [DHSimplePub] -> ARTGroup
+setup :: (UserId, DHSimple) -> [(UserId, DHSimplePub)] -> ARTGroup
 setup creator others =
   let suk = DHSimple 2
-      leafs = (exchange suk) <$> others
+      leafs = (\(i, s) -> (i, exchange suk s)) <$> others
       tree  = mkTree (creator:leafs)
       nodes = mkNodes <$> tree
       paths = Map.fromList []
-  in ARTGroup (getPub <$> leafs) paths
+  in ARTGroup leafs paths
 
 getVal (Node v _ _) = v
-getVal (Leaf v) = v
+getVal (Leaf i v) = v
 
 leafLocs1 (Node v l r) acc = Node () (leafLocs1 l (getVal r:acc)) (leafLocs1 r (getVal l:acc))
-leafLocs1 (Leaf v) acc = Leaf acc
+leafLocs1 (Leaf i v) acc = Leaf i acc
 
-chat2 = let alice = DHSimple 4
-            bob   = DHSimple 3
-            eve   = DHSimple 5
-            jon   = DHSimple 6
-            group = setup alice (getPub <$> [bob, eve, jon])
+chat2 = let alice = ("alice", DHSimple 4)
+            bob   = ("bob", getPub (DHSimple 3))
+            eve   = ("eve", getPub (DHSimple 5))
+            art   = ("art", getPub (DHSimple 6))
+            group = setup alice [bob, eve, art]
         in group
