@@ -97,13 +97,6 @@ exchange1 (DHSimple priv) p2 =
 
 type UserId = Text
 
-chat :: State (Map UserId DHSimplePub) ()
-chat = do
-  let alice = DHSimple 4
-      bob   = DHSimple 3
-
-  modify $ Map.insert "alice" (getPub alice)
-  modify $ Map.insert "bob" (getPub bob)
 
 data ARTGroup = ARTGroup
   { leafKeys :: [DHSimplePub]
@@ -119,11 +112,11 @@ setup creator others =
       paths = Map.fromList []
   in ARTGroup (getPub <$> leafs) paths
 
-data Loc = Top | L Loc | R Loc
-  deriving (Show, Eq)
+getVal (Node v _ _) = v
+getVal (Leaf v) = v
 
-leafLocs (Node _ l r) acc = Node acc (leafLocs l (L acc)) (leafLocs r (R acc))
-leafLocs (Leaf v) acc = Leaf acc
+leafLocs1 (Node v l r) acc = Node () (leafLocs1 l (getVal r:acc)) (leafLocs1 r (getVal l:acc))
+leafLocs1 (Leaf v) acc = Leaf acc
 
 chat2 = let alice = DHSimple 4
             bob   = DHSimple 3
