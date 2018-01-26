@@ -40,25 +40,34 @@ someFunc = putStrLn ("someFunc" :: Text)
 
 
 -- Should go to Tree.hs
-data Tree a = Leaf a | Node (Tree a) (Tree a)
+data Tree a b = Leaf a | Node b (Tree a b) (Tree a b)
             deriving (Show, Eq)
 
-instance (Monoid a) => Monoid (Tree a) where
-  mempty = Leaf mempty
-  mappend = Node
+mkNodes n@(Node _ l r) = Node (merge n) (mkNodes l) (mkNodes r)
+mkNodes (Leaf v) = Leaf v
 
-instance Foldable Tree where
-  foldMap f (Leaf v) = f v
-  foldMap f (Node t1 t2) = foldMap f t1 <> foldMap f t2
+merge (Node _ l r) = exchange1 (merge l) (merge r)
+merge (Leaf v) = v
 
-copaths :: (Monoid a) => (Tree a, [a]) -> [(a, [a])]
-copaths (Leaf v, acc) = [(v, acc)]
-copaths (Node l r, acc) = (copaths (l, merge r:acc))
-                          ++ (copaths (r, merge l:acc))
+test = mkNodes (Node ()
+                 (Node () (Leaf (DHSimple 5)) (Leaf (DHSimple 2)))
+                 (Node () (Leaf (DHSimple 3)) (Leaf (DHSimple 4)))
+               )
 
-merge :: (Monoid a) => Tree a -> a
-merge = foldr (<>) mempty
+treeMap f (Node v l r) = Node (f v) (treeMap f l) (treeMap f r)
+treeMap f (Leaf v) = Leaf (f v)
 
+mkForrest []  = []
+mkForrest [x] = [Leaf x]
+mkForrest (x1:x2:xs) = Node () (Leaf x1) (Leaf x2):mkForrest xs
+
+chop [] = []
+chop [x] = [x]
+chop (x1:x2:xs) = chop (Node () x1 x2 : chop xs)
+
+mkTree xs = case chop (mkForrest xs) of
+              [t] -> Just t
+              _   -> Nothing
 
 newtype DHSimple = DHSimple { private :: Int }
   deriving (Show, Eq)
@@ -81,6 +90,11 @@ exchange :: DHSimple -> DHSimplePub -> DHSimple
 exchange (DHSimple priv) (DHSimplePub pub) =
   DHSimple $ (pub ^ priv) `mod` p
 
+exchange1 :: DHSimple -> DHSimple -> DHSimple
+exchange1 (DHSimple priv) p2 =
+  let (DHSimplePub pub) = getPub p2
+  in DHSimple $ (pub ^ priv) `mod` p
+
 type UserId = Text
 
 chat :: State (Map UserId DHSimplePub) ()
@@ -91,21 +105,25 @@ chat = do
   modify $ Map.insert "alice" (getPub alice)
   modify $ Map.insert "bob" (getPub bob)
 
-data CoPath = CoPath
-  { trees :: [Tree UserId] }
-  deriving (Show, Eq)
-
 data ARTGroup = ARTGroup
   { leafKeys :: [DHSimplePub]
-  , copath   :: Map UserId CoPath
+  , copath   :: Map UserId [DHSimplePub]
   } deriving (Show, Eq)
 
 setup :: DHSimple -> [DHSimplePub] -> ARTGroup
 setup creator others =
   let suk = DHSimple 2
       leafs = (exchange suk) <$> others
+      tree  = mkTree (creator:leafs)
+      nodes = mkNodes <$> tree
       paths = Map.fromList []
   in ARTGroup (getPub <$> leafs) paths
+
+data Loc = Top | L Loc | R Loc
+  deriving (Show, Eq)
+
+leafLocs (Node _ l r) acc = Node acc (leafLocs l (L acc)) (leafLocs r (R acc))
+leafLocs (Leaf v) acc = Leaf acc
 
 chat2 = let alice = DHSimple 4
             bob   = DHSimple 3
@@ -113,19 +131,3 @@ chat2 = let alice = DHSimple 4
             jon   = DHSimple 6
             group = setup alice (getPub <$> [bob, eve, jon])
         in group
-
---keyExchange :: SecretKey -> PublicKey -> DhSecret
---keyExchange = flip dh
-
---publish :: (MonadRandom m) => m [PublicKey]
---publish = replicateM 2 (fmap toPublic generateSecretKey)
-
-{-
-setup :: (MonadRandom m, MonadIO m) => [PublicKey] -> m ()
-setup bundles = do
-  -- secretKey <- generateSecretKey
-  setupKey  <- generateSecretKey
-
-  let leafKeys = fmap (keyExchange setupKey) bundles
-  print (fmap secretKey leafKeys)
--}
