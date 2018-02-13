@@ -53,10 +53,6 @@ test = mkNodes (Node ()
                  (Node () (Leaf "a" (DHSimple 5)) (Leaf "b" (DHSimple 2)))
                  (Node () (Leaf "c" (DHSimple 3)) (Leaf "d" (DHSimple 4)))
                )
-{-
-treeMap f (Node v l r) = Node (f v) (treeMap f l) (treeMap f r)
-treeMap f (Leaf i v) = Leaf i (f v)
--}
 
 mkForrest []  = []
 mkForrest [(i, x)] = [Leaf i x]
@@ -66,9 +62,9 @@ chop [] = []
 chop [x] = [x]
 chop (x1:x2:xs) = chop (Node () x1 x2 : chop xs)
 
-mkTree xs = case chop (mkForrest xs) of
-              [t] -> Just t
-              _   -> Nothing
+mkTree (i1,x1) (i2,x2) xs = case chop (mkForrest ((i1, x1):(i2,x2):xs)) of
+              [t] -> t
+              _   -> Node () (Leaf i1 x1) (Leaf i2 x2)
 
 newtype DHSimple = DHSimple { private :: Int }
   deriving (Show, Eq)
@@ -104,14 +100,15 @@ data ARTGroup = ARTGroup
   , copath   :: Map UserId [DHSimple]
   } deriving (Show, Eq)
 
-setup :: (UserId, DHSimple) -> [(UserId, DHSimplePub)] -> Maybe ARTGroup
-setup creator others =
+setup :: (UserId, DHSimple) -> (UserId, DHSimplePub) -> [(UserId, DHSimplePub)] -> ARTGroup
+setup creator m1 rest =
   let suk = DHSimple 2
-      leafs = (\(i, s) -> (i, exchange suk s)) <$> others
-      tree  = mkTree (creator:leafs)
-      nodes = mkNodes <$> tree
-      paths = Map.fromList <$> (flip leafLocs1 [] <$> nodes)
-  in (ARTGroup leafs) <$> paths
+      leafs = (\(i, s) -> (i, exchange suk s)) <$> rest
+      m1l   = (\(i, s) -> (i, exchange suk s)) $ m1
+      tree  = mkTree creator m1l leafs
+      nodes = mkNodes tree
+      paths = Map.fromList $ leafLocs1 nodes []
+  in ARTGroup (m1l:leafs) paths
 
 getVal (Node v _ _) = v
 getVal (Leaf i v) = v
@@ -123,5 +120,5 @@ chat2 = let alice = ("alice", DHSimple 4)
             bob   = ("bob", getPub (DHSimple 3))
             eve   = ("eve", getPub (DHSimple 5))
             art   = ("art", getPub (DHSimple 6))
-            group = setup alice [bob, eve, art]
+            group = setup alice bob [eve, art]
         in group
