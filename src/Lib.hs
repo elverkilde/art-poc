@@ -31,6 +31,8 @@ import Control.Monad.State
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
+import Control.Monad (join)
+
 -- | Prints someFunc
 --
 -- >>> someFunc 10
@@ -96,29 +98,40 @@ type UserId = Text
 
 
 data ARTGroup = ARTGroup
-  { leafKeys :: [(UserId, DHSimple)]
-  , copath   :: Map UserId [DHSimple]
+  { leafKeys :: Map UserId DHSimplePub
+  , copath   :: Map UserId [DHSimplePub]
+  , setupKey :: DHSimplePub
   } deriving (Show, Eq)
 
 setup :: (UserId, DHSimple) -> (UserId, DHSimplePub) -> [(UserId, DHSimplePub)] -> ARTGroup
 setup creator m1 rest =
-  let suk = DHSimple 2
+  let suk   = DHSimple 2
       leafs = (\(i, s) -> (i, exchange suk s)) <$> rest
       m1l   = (\(i, s) -> (i, exchange suk s)) $ m1
       tree  = mkTree creator m1l leafs
       nodes = mkNodes tree
-      paths = Map.fromList $ leafLocs1 nodes []
-  in ARTGroup (m1l:leafs) paths
+      paths = Map.map (fmap getPub) $ Map.fromList $ coPaths nodes []
+      pleafs = Map.map getPub $ Map.fromList $ m1l:leafs
+  in ARTGroup pleafs paths (getPub suk)
 
+getVal :: Tree a a -> a
 getVal (Node v _ _) = v
-getVal (Leaf i v) = v
+getVal (Leaf _ v) = v
 
-leafLocs1 (Node v l r) acc = (leafLocs1 l (getVal r:acc)) ++ (leafLocs1 r (getVal l:acc))
-leafLocs1 (Leaf i v) acc = [(i, acc)]
+coPaths :: Tree a a -> [a] -> [(UserId, [a])]
+coPaths (Node _ l r) acc = (coPaths l (getVal r:acc)) ++ (coPaths r (getVal l:acc))
+coPaths (Leaf i _) acc = [(i, acc)]
 
+chat2 :: ARTGroup
 chat2 = let alice = ("alice", DHSimple 4)
             bob   = ("bob", getPub (DHSimple 3))
             eve   = ("eve", getPub (DHSimple 5))
             art   = ("art", getPub (DHSimple 6))
             group = setup alice bob [eve, art]
         in group
+
+deriveTreeKey :: (UserId, DHSimple) -> ARTGroup -> Maybe DHSimple
+deriveTreeKey (name, secret) (ARTGroup ls cPaths suk) =
+    let leafKey = exchange secret suk
+        coPath = Map.lookup name cPaths
+    in (foldl exchange leafKey) <$> coPath
