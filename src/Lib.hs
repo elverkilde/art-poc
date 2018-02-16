@@ -23,15 +23,14 @@ import Lib.Prelude
 -- Tree.hs imports
 
 -- Setup.hs imports
-import Control.Monad.Random.Class
+import           Control.Monad.Random.Class
 --import Crypto.Random.Types (MonadRandom)
 --import Crypto.PubKey.Curve25519
 
-import Control.Monad.State
-import Data.Map.Strict (Map)
+import qualified Crypto.KDF.HKDF as HKDF
+import           Control.Monad.State
+import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-
-import Control.Monad (join)
 
 -- | Prints someFunc
 --
@@ -135,3 +134,5 @@ deriveTreeKey (name, secret) (ARTGroup ls cPaths suk) =
     let leafKey = exchange secret suk
         coPath = Map.lookup name cPaths
     in (foldl exchange leafKey) <$> coPath
+
+deriveStageKey stageKey treeKey = HKDF.extract stageKey treeKey
